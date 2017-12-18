@@ -316,7 +316,7 @@ class PlanningGraph():
             node_action = PgNode_a(action)
 
             if all(prenode in self.s_levels[level] for prenode in node_action.prenodes):
-                actions.add(action)
+                actions.add(node_action)
 
                 for state in node_action.prenodes:
                     state.children.add(node_action)
@@ -348,7 +348,7 @@ class PlanningGraph():
                 previous_action.children.add(node_state)
                 node_state.parents.add(previous_action)
                 
-                states.Add(state) 
+                states.add(node_state) 
 
         self.s_levels.append(states)
 
@@ -387,6 +387,7 @@ class PlanningGraph():
         :param node_a2: PgNode_a
         :return: bool
         """
+        
         if not self.serial:
             return False
         if node_a1.is_persistent or node_a2.is_persistent:
@@ -531,28 +532,41 @@ class PlanningGraph():
         # TODO test for Inconsistent Support between nodes
         for parent_s1 in node_s1.parents:
             for parent_s2 in node_s2.parents:
-                if(parent_s1.is_mutex(parent_s2)):
-                    return True
+                if(parent_s1.is_mutex(parent_s2) != True):
+                    return False
 
-        return False
+        return True
 
     def h_levelsum(self) -> int:
         """The sum of the level costs of the individual goals (admissible if goals independent)
 
         :return: int
         """
-        level_sum = 0
+        
         # TODO implement
         # for each goal in the problem, determine the level cost, then add them together
+
+        # I’ve got my submission rejected due to `h_levelsum` heuristic being not optimal, BUT the interesting thing is that code which was suggested in a review contains access to `PgNode_s.literal` instance variable which is gone since April I think.
+        # I’ve opened an issue in Github https://github.com/udacity/AIND-Planning/issues/13
+
+        # Question: are we expected to calculate literals using `expr(state_node.symbol)` and `expr('~{}'.format(state_node.symbol))` when calculating `h_levelsum` then? Or should we just check for goal matches like `goal == state_node.symbol and state_node.is_pos is True`?
+
+        # @chris.gearhart suspect ^^ this one is for you as you did refactoring of the project
+
+        level_sum = 0
         goals = self.problem.goal
 
-        for goal in goals:
-            for level in range(len(self.s_level)):
-                for state in self.s_levels[level]:
-                    if(goal == state.literal):
-                        level_sum += level
-                        goals.remove(state.literal)
-                    if not goals:
-                        return level_sum                        
+        for level in range(len(self.s_levels)):
+            for state in self.s_levels[level]:
+                if(state.symbol in goals and state.is_pos is True):
+                    level_sum += level
+
+                    try:
+                        goals.remove(expr(state.symbol))
+                    except ValueError:
+                        pass
+                        
+                if not goals:
+                    return level_sum                        
 
         return level_sum
